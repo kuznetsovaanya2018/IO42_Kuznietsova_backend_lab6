@@ -1,0 +1,21 @@
+info:
+  name: Create record
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/record"
+  body:
+    type: json
+    data: '{"user_id": 2, "category_id": 1, "amount": 100}'
+  auth:
+    type: bearer
+    token: "{{userToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

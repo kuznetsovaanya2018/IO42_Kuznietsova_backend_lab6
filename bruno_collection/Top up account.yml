@@ -1,0 +1,21 @@
+info:
+  name: Top up account
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{baseUrl}}/account/1/topup"
+  body:
+    type: json
+    data: '{"amount": 500}'
+  auth:
+    type: bearer
+    token: "{{userToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

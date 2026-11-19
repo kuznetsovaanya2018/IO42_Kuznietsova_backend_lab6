@@ -1,0 +1,16 @@
+info:
+  name: ValidateUser
+  type: grpc
+  seq: 17
+
+grpc:
+  url: "{{grpcUrl}}"
+  method: /auth.AuthService/ValidateUser
+  methodType: unary
+  metadata:
+    - name: authorization
+      value: Bearer {{userToken}}
+  message:
+    - title: message 1
+      message: '{"user_id": 2}'
+  auth: inherit

@@ -1,0 +1,21 @@
+info:
+  name: Create account
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{baseUrl}}/account"
+  body:
+    type: json
+    data: '{"user_id": 2}'
+  auth:
+    type: bearer
+    token: "{{userToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

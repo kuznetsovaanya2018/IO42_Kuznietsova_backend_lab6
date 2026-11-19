@@ -1,0 +1,21 @@
+info:
+  name: RPC single
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{baseUrl}}/rpc"
+  body:
+    type: json
+    data: '{"jsonrpc": "2.0", "method": "create_record", "params": {"user_id": 2, "category_id": 1, "amount": 100.0}, "id": 1}'
+  auth:
+    type: bearer
+    token: "{{userToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,21 @@
+info:
+  name: Create global category
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{baseUrl}}/category/global"
+  body:
+    type: json
+    data: '{"name": "Food"}'
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,13 @@
+info:
+  name: ValidateToken
+  type: grpc
+  seq: 16
+
+grpc:
+  url: "{{grpcUrl}}"
+  method: /auth.AuthService/ValidateToken
+  methodType: unary
+  message:
+    - title: message 1
+      message: '{"token": "{{userToken}}"}'
+  auth: inherit

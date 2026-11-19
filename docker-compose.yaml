@@ -1,0 +1,68 @@
+services:
+  user_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: user_svc
+      POSTGRES_PASSWORD: user_svc
+      POSTGRES_DB: user_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_svc -d user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  expense_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: expense_svc
+      POSTGRES_PASSWORD: expense_svc
+      POSTGRES_DB: expense_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - expense_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U expense_svc -d expense_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  user_service:
+    build:
+      context: .
+      dockerfile: user_service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://user_svc:user_svc@user_db:5432/user_db
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-key-change-me-0123456789abcdef}
+      GRPC_PORT: "50051"
+    depends_on:
+      user_db:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+      - "50051:50051"
+    command: sh -c "flask --app app db upgrade && python app.py"
+
+  expense_service:
+    build:
+      context: .
+      dockerfile: expense_service/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://expense_svc:expense_svc@expense_db:5432/expense_db
+      USER_SERVICE_GRPC_ADDR: user_service:50051
+    depends_on:
+      expense_db:
+        condition: service_healthy
+      user_service:
+        condition: service_started
+    ports:
+      - "5000:5000"
+    command: sh -c "flask --app app db upgrade && python app.py"
+
+volumes:
+  user_pgdata:
+  expense_pgdata:

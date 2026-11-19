@@ -1,0 +1,27 @@
+info:
+  name: RPC batch with errors
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{baseUrl}}/rpc"
+  body:
+    type: json
+    data: |-
+      [
+        {"jsonrpc": "2.0", "method": "get_record", "params": {"record_id": 1}, "id": 1},
+        {"jsonrpc": "2.0", "method": "unknown_method", "id": 2},
+        {"jsonrpc": "2.0", "method": "create_record", "params": {"user_id": 2}, "id": 3},
+        {"jsonrpc": "2.0", "method": "list_records", "params": {"category_id": 1}}
+      ]
+  auth:
+    type: bearer
+    token: "{{userToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,12 @@
+name: local
+variables:
+  - name: baseUrl
+    value: http://127.0.0.1:5000
+    description: ""
+  - name: userUrl
+    value: http://127.0.0.1:5001
+    description: ""
+  - name: grpcUrl
+    value: grpc://localhost:50051
+    description: ""
+

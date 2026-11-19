@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package auth;
+
+service AuthService {
+  // Публічний метод: токен передається в тілі запиту
+  rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+  // Захищений метод: токен передається в gRPC Metadata (authorization)
+  rpc ValidateUser (ValidateUserRequest) returns (ValidateUserResponse);
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool is_valid = 1;
+  string user_id = 2;
+  repeated string roles = 3;
+}
+
+message ValidateUserRequest {
+  int32 user_id = 1;
+}
+
+message ValidateUserResponse {
+  bool exists = 1;
+  string role = 2;
+}
