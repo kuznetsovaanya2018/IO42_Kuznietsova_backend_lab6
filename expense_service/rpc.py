@@ -7,7 +7,13 @@ from errors import AppError
 from models import db
 from schemas import RecordFilterSchema, RecordIdSchema, RecordSchema
 
+from opentelemetry import trace
+
+from app_metrics import jsonrpc_requests
+
 log = logging.getLogger(__name__)
+
+tracer = trace.get_tracer("expense_service")
 
 # Стандартні коди помилок JSON-RPC 2.0
 PARSE_ERROR = -32700
@@ -86,29 +92,36 @@ def process_request(item):
         or not isinstance(item.get("method"), str)
         or not id_is_valid
     ):
+        jsonrpc_requests.add(1, {"method": "invalid", "status": "error"})
         return error_response(
             request_id if id_is_valid else None, INVALID_REQUEST, "Invalid Request"
         )
 
     is_notification = "id" not in item
+    method_name = item["method"] if item["method"] in METHODS else "unknown"
     handler = METHODS.get(item["method"])
     if handler is None:
+        jsonrpc_requests.add(1, {"method": method_name, "status": "error"})
         if is_notification:
             return None
         return error_response(request_id, METHOD_NOT_FOUND, "Method not found")
 
     params = item.get("params", {})
+    status = "ok"
     try:
         if not isinstance(params, dict):
             raise ValidationError(
                 {"params": ["Params must be an object with named parameters"]}
             )
-        result = handler(params)
+        with tracer.start_as_current_span(f"jsonrpc.{method_name}"):
+            result = handler(params)
     except ValidationError as err:
         db.session.rollback()
+        status = "error"
         response = error_response(request_id, INVALID_PARAMS, "Invalid params", err.messages)
     except AppError as err:
         db.session.rollback()
+        status = "error"
         response = error_response(
             request_id,
             HTTP_TO_RPC_CODE.get(err.status, INTERNAL_ERROR),
@@ -117,9 +130,11 @@ def process_request(item):
         )
     except Exception:
         db.session.rollback()
-        log.exception("Unhandled error in JSON-RPC method %s", item["method"])
+        status = "error"
+        log.exception("Unhandled error in JSON-RPC method %s", method_name)
         response = error_response(request_id, INTERNAL_ERROR, "Internal error")
     else:
         response = {"jsonrpc": "2.0", "result": result, "id": request_id}
 
+    jsonrpc_requests.add(1, {"method": method_name, "status": status})
     return None if is_notification else response

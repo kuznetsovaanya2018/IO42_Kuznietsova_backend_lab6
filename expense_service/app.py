@@ -16,6 +16,15 @@ from schemas import AccountSchema, CategorySchema, RecordSchema, TopUpSchema
 from auth import authenticate
 from rpc import INVALID_REQUEST, PARSE_ERROR, error_response, process_request
 
+import logging
+
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+
+from telemetry import init_telemetry
+
+init_telemetry("expense-service")
+log = logging.getLogger("expense_service")
+
 def database_url():
     url = os.getenv(
         "DATABASE_URL",
@@ -27,6 +36,7 @@ def database_url():
 
 
 app = Flask(__name__)
+FlaskInstrumentor().instrument_app(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -239,6 +249,7 @@ def rpc_endpoint():
     if isinstance(payload, list):  # Batch
         if not payload:
             return jsonify(error_response(None, INVALID_REQUEST, "Invalid Request")), 200
+        log.info("JSON-RPC batch received: %d requests", len(payload))
         responses = [
             response
             for response in (process_request(item) for item in payload)

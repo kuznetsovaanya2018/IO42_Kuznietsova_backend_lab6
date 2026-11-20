@@ -1,11 +1,13 @@
 import collections
 import os
+import time
 
 import grpc
 from flask import g, has_request_context
 
 import auth_pb2
 import auth_pb2_grpc
+from app_metrics import grpc_client_duration
 from errors import AppError
 
 
@@ -51,21 +53,33 @@ def get_stub():
     return _stub
 
 
-def _call(method, request):
+def _call(method_name, method, request):
+    started = time.perf_counter()
+    status = "ok"
     try:
         return method(request, timeout=5)
     except grpc.RpcError as err:
         code = err.code()
+        status = code.name.lower()
         if code == grpc.StatusCode.UNAUTHENTICATED:
             raise AppError(401, "unauthorized", err.details())
         if code == grpc.StatusCode.PERMISSION_DENIED:
             raise AppError(403, "forbidden", err.details())
         raise AppError(503, "service_unavailable", "User Service is unavailable")
+    finally:
+        grpc_client_duration.record(
+            (time.perf_counter() - started) * 1000,
+            {"method": method_name, "status": status},
+        )
 
 
 def validate_token(token):
-    return _call(get_stub().ValidateToken, auth_pb2.ValidateTokenRequest(token=token))
+    return _call(
+        "ValidateToken", get_stub().ValidateToken, auth_pb2.ValidateTokenRequest(token=token)
+    )
 
 
 def validate_user(user_id):
-    return _call(get_stub().ValidateUser, auth_pb2.ValidateUserRequest(user_id=user_id))
+    return _call(
+        "ValidateUser", get_stub().ValidateUser, auth_pb2.ValidateUserRequest(user_id=user_id)
+    )
