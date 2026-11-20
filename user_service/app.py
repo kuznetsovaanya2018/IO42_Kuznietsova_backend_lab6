@@ -16,6 +16,15 @@ from grpc_server import start_grpc_server
 from models import db, UserModel
 from schemas import LoginSchema, RegisterSchema, RoleSchema
 
+import logging
+
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+
+from app_metrics import login_attempts, users_registered
+from telemetry import init_telemetry
+
+init_telemetry("user-service")
+log = logging.getLogger("user_service")
 
 def database_url():
     url = os.getenv(
@@ -38,6 +47,8 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 db.init_app(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
+
+FlaskInstrumentor().instrument_app(app)
 
 register_schema = RegisterSchema()
 login_schema = LoginSchema()
@@ -87,7 +98,6 @@ def healthz_ready():
         return jsonify({"status": "not_ready"}), 503
     return jsonify({"status": "ready"}), 200
 
-
 @app.route("/register", methods=["POST"])
 def register():
     try:
@@ -100,6 +110,7 @@ def register():
         db.select(UserModel).where(UserModel.name == name)
     ).first()
     if exists is not None:
+        log.warning("Registration rejected: user already exists")
         return jsonify({"error": "conflict", "message": "User already exists"}), 409
 
     user = UserModel(name=name, password_hash=hash_password(data["password"]), role="user")
@@ -109,6 +120,8 @@ def register():
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "conflict", "message": "User already exists"}), 409
+    users_registered.add(1)
+    log.info("User registered: id=%s", user.id)
     return jsonify(user.to_dict()), 201
 
 
@@ -123,13 +136,16 @@ def login():
         db.select(UserModel).where(UserModel.name == data["name"].strip())
     ).first()
     if user is None or not verify_password(data["password"], user.password_hash):
+        login_attempts.add(1, {"result": "failure"})
+        log.warning("Failed login attempt")
         return jsonify({"error": "unauthorized", "message": "Invalid credentials"}), 401
 
     token = create_access_token(
         identity=str(user.id), additional_claims={"roles": [user.role]}
     )
+    login_attempts.add(1, {"result": "success"})
+    log.info("User logged in: id=%s", user.id)
     return jsonify({"access_token": token, "token_type": "Bearer"}), 200
-
 
 @app.route("/users", methods=["GET"])
 @roles_required("auditor", "admin")
