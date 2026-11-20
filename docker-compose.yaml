@@ -39,9 +39,12 @@ services:
       DATABASE_URL: postgresql+psycopg://user_svc:user_svc@user_db:5432/user_db
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-key-change-me-0123456789abcdef}
       GRPC_PORT: "50051"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     depends_on:
       user_db:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "5001:5001"
       - "50051:50051"
@@ -54,14 +57,53 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://expense_svc:expense_svc@expense_db:5432/expense_db
       USER_SERVICE_GRPC_ADDR: user_service:50051
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     depends_on:
       expense_db:
         condition: service_healthy
       user_service:
         condition: service_started
+      otel-collector:
+        condition: service_started
     ports:
       - "5000:5000"
     command: sh -c "flask --app app db upgrade && python app.py"
+
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    ports:
+      - "16686:16686"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - jaeger
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - otel-collector
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json_dashboards
+    depends_on:
+      - prometheus
 
 volumes:
   user_pgdata:
